@@ -33,26 +33,29 @@ Human: It's fascinating to see your vision unfold. Any new projects or innovatio
 Elon: Always! But right now, I'm particularly excited about Neuralink. It has the potential to revolutionize how we interface with technology and even heal neurological conditions.
 `;
 
+
+
 const formSchema = z.object({
   name: z.string().min(1, {
     message: "Name is required.",
-  }),
+  }).optional(),
   description: z.string().min(1, {
     message: "Description is required.",
-  }),
+  }).optional(),
   instructions: z.string().min(200, {
     message: "Instructions require at least 200 characters."
-  }),
+  }).optional(),
   seed: z.string().min(200, {
     message: "Seed requires at least 200 characters."
-  }),
+  }).optional(),
   src: z.string().min(1, {
     message: "Image is required."
-  }),
+  }).optional(),
   categoryId: z.string().min(1, {
     message: "Category is required",
-  }),
+  }).optional(),
 });
+
 
 interface CompanionFormProps {
   categories: Category[];
@@ -82,6 +85,8 @@ export const CompanionForm = ({
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
+      console.log(values);
+      
       if (initialData) {
         await axios.patch(`/api/companion/${initialData.id}`, values);
       } else {
@@ -90,16 +95,16 @@ export const CompanionForm = ({
 
       toast({
         description: "Success.",
-        duration: 3000,
+        duration: 2000,
       });
 
       router.refresh();
       router.push("/");
-    } catch (error) {
+    } catch (error) { 
       toast({
         variant: "destructive",
         description: "Something went wrong.",
-        duration: 3000,
+        duration: 2000,
       });
     }
   };

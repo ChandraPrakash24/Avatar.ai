@@ -32,7 +32,7 @@ export async function POST(
 
     const companion = await prismadb.companion.update({
       where: {
-        id: params.chatId
+        id: params.chatId,
       },
       data: {
         messages: {
@@ -42,7 +42,7 @@ export async function POST(
             userId: user.id,
           },
         },
-      }
+      },
     });
 
     if (!companion) {
@@ -82,12 +82,14 @@ export async function POST(
       relevantHistory = similarDocs.map((doc) => doc.pageContent).join("\n");
     }
     const { handlers } = LangChainStream();
+
     // Call Replicate for inference
     const model = new Replicate({
       model:
-        "a16z-infra/llama-2-13b-chat:df7690f1994d94e96ad9d568eac121aecf50684a0b0963b25a41cc40061269e5",
+        "a16z-infra/llama-2-13b-code:df7690f1994d94e96ad9d568eac121aecf50684a0b0963b25a41cc40061269e5",
       input: {
         max_length: 2048,
+        language: "python", // Specify the desired programming language
       },
       apiKey: process.env.REPLICATE_API_TOKEN,
       callbackManager: CallbackManager.fromHandlers(handlers),
@@ -100,50 +102,53 @@ export async function POST(
       await model
         .call(
           `
-        ONLY generate plain sentences without prefix of who is speaking. DO NOT use ${companion.name}: prefix. 
-
-        ${companion.instructions}
-
-        Below are relevant details about ${companion.name}'s past and the conversation you are in.
-        ${relevantHistory}
-
-
-        ${recentChatHistory}\n${companion.name}:`
+          Generate a Python code snippet for Fizz Buzz without any additional text.
+          `
         )
         .catch(console.error)
     );
 
-    const cleaned = resp.replaceAll(",", "");
-    const chunks = cleaned.split("\n");
-    const response = chunks[0];
+    // Check if the response contains code
+    const containsCode = resp.includes("import") || resp.includes("function") || resp.includes("class");
 
-    await memoryManager.writeToHistory("" + response.trim(), companionKey);
+    // If the response does not contain code, you can handle it accordingly
+    // if (!containsCode) {
+    //   return new NextResponse("Response does not contain code", { status: 400 });
+    // }
+
+    await memoryManager.writeToHistory("" + resp.trim(), companionKey);
+
+    //TODO: ADD HERE send res to open api with message "formate this" and store apenapi responce to newRes
+
+    // Create a Readable stream from the response
     var Readable = require("stream").Readable;
-
     let s = new Readable();
-    s.push(response);
+    s.push(resp);
     s.push(null);
-    if (response !== undefined && response.length > 1) {
-      memoryManager.writeToHistory("" + response.trim(), companionKey);
+
+    // Write the response to your database or perform any other necessary actions
+    if (resp !== undefined && resp.length > 1) {
+      memoryManager.writeToHistory("" + resp.trim(), companionKey);
 
       await prismadb.companion.update({
         where: {
-          id: params.chatId
+          id: params.chatId,
         },
         data: {
           messages: {
             create: {
-              content: response.trim(),
+              content: resp.trim(),
               role: "system",
               userId: user.id,
             },
           },
-        }
+        },
       });
     }
 
+    // Return a StreamingTextResponse with the code
     return new StreamingTextResponse(s);
   } catch (error) {
     return new NextResponse("Internal Error", { status: 500 });
   }
-};
+}
